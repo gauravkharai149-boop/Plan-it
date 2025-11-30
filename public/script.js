@@ -1,6 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
     // --- State & Config ---
-    const API_URL = `${window.location.origin}/api`;
     let userId = localStorage.getItem('planit_user_id');
 
     if (!userId) {
@@ -19,6 +18,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeModals = document.querySelectorAll('.close-modal');
     const habitForm = document.getElementById('habit-form');
     const taskForm = document.getElementById('task-form');
+
+    // --- LocalStorage Helper Functions ---
+    function getHabits() {
+        const habits = localStorage.getItem('planit_habits');
+        return habits ? JSON.parse(habits) : [];
+    }
+
+    function saveHabits(habits) {
+        localStorage.setItem('planit_habits', JSON.stringify(habits));
+    }
+
+    function getTasks() {
+        const tasks = localStorage.getItem('planit_tasks');
+        return tasks ? JSON.parse(tasks) : [];
+    }
+
+    function saveTasks(tasks) {
+        localStorage.setItem('planit_tasks', JSON.stringify(tasks));
+    }
 
     // --- Theme Logic ---
     const savedTheme = localStorage.getItem('theme') || 'light';
@@ -45,15 +63,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Data Fetching ---
-    async function fetchHabits() {
-        const res = await fetch(`${API_URL}/habits/${userId}`);
-        const habits = await res.json();
+    function fetchHabits() {
+        const habits = getHabits();
         renderHabits(habits);
     }
 
-    async function fetchTasks() {
-        const res = await fetch(`${API_URL}/tasks/${userId}`);
-        const tasks = await res.json();
+    function fetchTasks() {
+        const tasks = getTasks();
         renderTasks(tasks);
     }
 
@@ -63,12 +79,9 @@ document.addEventListener('DOMContentLoaded', () => {
         habits.forEach(habit => {
             const today = new Date().toISOString().split('T')[0];
             const isCompletedToday = habit.completedDates.includes(today);
-            const progress = (habit.completedDates.length / habit.goal) * 100; // Simplified progress logic
 
-            // Calculate circle stroke offset
             const radius = 25;
             const circumference = 2 * Math.PI * radius;
-            const offset = circumference - (isCompletedToday ? 100 : 0) / 100 * circumference; // Just toggle for today for visual simplicity in this demo
 
             const card = document.createElement('div');
             card.className = `habit-card ${isCompletedToday ? 'completed' : ''}`;
@@ -95,7 +108,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderTasks(tasks) {
         scheduleBody.innerHTML = '';
-        // Sort by time
         tasks.sort((a, b) => a.time.localeCompare(b.time));
 
         tasks.forEach(task => {
@@ -118,8 +130,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Actions ---
-    window.toggleHabit = async (id, isCompleted) => {
-        const habits = await (await fetch(`${API_URL}/habits/${userId}`)).json();
+    window.toggleHabit = (id, isCompleted) => {
+        const habits = getHabits();
         const habit = habits.find(h => h.id === id);
         const today = new Date().toISOString().split('T')[0];
 
@@ -129,35 +141,30 @@ document.addEventListener('DOMContentLoaded', () => {
             habit.completedDates.push(today);
         }
 
-        await fetch(`${API_URL}/habits/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ completedDates: habit.completedDates })
-        });
+        saveHabits(habits);
         fetchHabits();
     };
 
-    window.deleteHabit = async (id) => {
-        // if(confirm('Delete this habit?')) {
-        await fetch(`${API_URL}/habits/${id}`, { method: 'DELETE' });
+    window.deleteHabit = (id) => {
+        let habits = getHabits();
+        habits = habits.filter(h => h.id !== id);
+        saveHabits(habits);
         fetchHabits();
-        // }
     };
 
-    window.toggleTask = async (id, isCompleted) => {
-        await fetch(`${API_URL}/tasks/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ completed: !isCompleted })
-        });
+    window.toggleTask = (id, isCompleted) => {
+        const tasks = getTasks();
+        const task = tasks.find(t => t.id === id);
+        task.completed = !isCompleted;
+        saveTasks(tasks);
         fetchTasks();
     };
 
-    window.deleteTask = async (id) => {
-        // if(confirm('Delete this task?')) {
-        await fetch(`${API_URL}/tasks/${id}`, { method: 'DELETE' });
+    window.deleteTask = (id) => {
+        let tasks = getTasks();
+        tasks = tasks.filter(t => t.id !== id);
+        saveTasks(tasks);
         fetchTasks();
-        // }
     };
 
     // --- Modals ---
@@ -177,32 +184,42 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- Forms ---
-    habitForm.onsubmit = async (e) => {
+    habitForm.onsubmit = (e) => {
         e.preventDefault();
         const title = document.getElementById('habit-title').value;
         const goal = document.getElementById('habit-goal').value;
 
-        await fetch(`${API_URL}/habits`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId, title, goal })
-        });
+        const habits = getHabits();
+        const newHabit = {
+            id: Date.now().toString(),
+            userId,
+            title,
+            goal: parseInt(goal),
+            completedDates: []
+        };
+        habits.push(newHabit);
+        saveHabits(habits);
 
         habitForm.reset();
         habitModal.style.display = 'none';
         fetchHabits();
     };
 
-    taskForm.onsubmit = async (e) => {
+    taskForm.onsubmit = (e) => {
         e.preventDefault();
         const title = document.getElementById('task-title').value;
         const time = document.getElementById('task-time').value;
 
-        await fetch(`${API_URL}/tasks`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId, title, time })
-        });
+        const tasks = getTasks();
+        const newTask = {
+            id: Date.now().toString(),
+            userId,
+            title,
+            time,
+            completed: false
+        };
+        tasks.push(newTask);
+        saveTasks(tasks);
 
         taskForm.reset();
         taskModal.style.display = 'none';
