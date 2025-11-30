@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     // --- State & Config ---
-    const API_URL = 'http://localhost:3000/api';
+    const API_URL = `${window.location.origin}/api`;
     let userId = localStorage.getItem('planit_user_id');
 
     if (!userId) {
