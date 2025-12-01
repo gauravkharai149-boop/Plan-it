@@ -108,7 +108,18 @@ app.delete('/api/tasks/:id', (req, res) => {
     res.json({ success: true });
 });
 
-// Start server
-app.listen(PORT, () => {
-    console.log(`Server running at http://localhost:${PORT}`);
-});
+// Start server with auto port selection
+function startServer(port) {
+    const server = app.listen(port, () => {
+        console.log(`✅ Server running at http://localhost:${port}`);
+    }).on('error', (err) => {
+        if (err.code === 'EADDRINUSE') {
+            console.log(`⚠️  Port ${port} is busy, trying ${port + 1}...`);
+            startServer(port + 1);
+        } else {
+            console.error('Server error:', err);
+        }
+    });
+}
+
+startServer(PORT);
