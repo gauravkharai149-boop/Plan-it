@@ -1,232 +1,215 @@
-document.addEventListener('DOMContentLoaded', () => {
-    // --- State & Config ---
-    let userId = localStorage.getItem('planit_user_id');
+document.addEventListener("DOMContentLoaded", function () {
 
-    if (!userId) {
-        userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        localStorage.setItem('planit_user_id', userId);
-    }
+    // Basic DOM references
+    var habitForm = document.getElementById("habitForm");
+    var taskForm = document.getElementById("taskForm");
+    var habitsList = document.getElementById("habitsList");
+    var tasksTableBody = document.querySelector("#tasksTable tbody");
+    var themeBtn = document.getElementById("themeBtn");
 
-    // --- DOM Elements ---
-    const themeToggle = document.getElementById('theme-toggle');
-    const habitsGrid = document.getElementById('habits-grid');
-    const scheduleBody = document.getElementById('schedule-body');
-    const addHabitBtn = document.getElementById('add-habit-btn');
-    const addTaskBtn = document.getElementById('add-task-btn');
-    const habitModal = document.getElementById('habit-modal');
-    const taskModal = document.getElementById('task-modal');
-    const closeModals = document.querySelectorAll('.close-modal');
-    const habitForm = document.getElementById('habit-form');
-    const taskForm = document.getElementById('task-form');
+    // Storage keys
+    var HABITS_KEY = "simple_habits";
+    var TASKS_KEY = "simple_tasks";
 
-    // --- LocalStorage Helper Functions ---
-    function getHabits() {
-        const habits = localStorage.getItem('planit_habits');
-        return habits ? JSON.parse(habits) : [];
-    }
-
-    function saveHabits(habits) {
-        localStorage.setItem('planit_habits', JSON.stringify(habits));
-    }
-
-    function getTasks() {
-        const tasks = localStorage.getItem('planit_tasks');
-        return tasks ? JSON.parse(tasks) : [];
-    }
-
-    function saveTasks(tasks) {
-        localStorage.setItem('planit_tasks', JSON.stringify(tasks));
-    }
-
-    // --- Theme Logic ---
-    const savedTheme = localStorage.getItem('theme') || 'light';
-    document.documentElement.setAttribute('data-theme', savedTheme);
-    updateThemeIcon(savedTheme);
-
-    themeToggle.addEventListener('click', () => {
-        const currentTheme = document.documentElement.getAttribute('data-theme');
-        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-        document.documentElement.setAttribute('data-theme', newTheme);
-        localStorage.setItem('theme', newTheme);
-        updateThemeIcon(newTheme);
-    });
-
-    function updateThemeIcon(theme) {
-        const icon = themeToggle.querySelector('i');
-        if (theme === 'dark') {
-            icon.classList.remove('fa-moon');
-            icon.classList.add('fa-sun');
-        } else {
-            icon.classList.remove('fa-sun');
-            icon.classList.add('fa-moon');
+    // Load data from storage
+    function loadData(key) {
+        var data = localStorage.getItem(key);
+        if (data) {
+            return JSON.parse(data);
         }
+        return [];
     }
 
-    // --- Data Fetching ---
-    function fetchHabits() {
-        const habits = getHabits();
-        renderHabits(habits);
+    // Save data to storage
+    function saveData(key, value) {
+        localStorage.setItem(key, JSON.stringify(value));
     }
 
-    function fetchTasks() {
-        const tasks = getTasks();
-        renderTasks(tasks);
+    // Make simple id
+    function makeId() {
+        return "id" + Math.random().toString(36).substr(2, 6);
     }
 
-    // --- Rendering ---
-    function renderHabits(habits) {
-        habitsGrid.innerHTML = '';
-        habits.forEach(habit => {
-            const today = new Date().toISOString().split('T')[0];
-            const isCompletedToday = habit.completedDates.includes(today);
+    // Today's date in yyyy-mm-dd
+    function today() {
+        return new Date().toISOString().split("T")[0];
+    }
 
-            const radius = 25;
-            const circumference = 2 * Math.PI * radius;
+    // Show all habits
+    function showHabits() {
+        var habits = loadData(HABITS_KEY);
+        habitsList.innerHTML = "";
 
-            const card = document.createElement('div');
-            card.className = `habit-card ${isCompletedToday ? 'completed' : ''}`;
-            card.innerHTML = `
-                <div class="habit-info">
-                    <h3>${habit.title}</h3>
-                    <p>Goal: ${habit.goal} days/week</p>
-                </div>
-                <div class="progress-ring" onclick="toggleHabit('${habit.id}', ${isCompletedToday})">
-                    <svg>
-                        <circle class="progress-ring-bg" cx="30" cy="30" r="${radius}"></circle>
-                        <circle class="progress-ring-fill" cx="30" cy="30" r="${radius}" 
-                                style="stroke-dashoffset: ${isCompletedToday ? 0 : circumference}"></circle>
-                    </svg>
-                    <i class="fa-solid fa-check check-icon"></i>
-                </div>
-                <div class="habit-actions">
-                    <button class="action-btn delete" onclick="deleteHabit('${habit.id}')"><i class="fa-solid fa-trash"></i></button>
-                </div>
-            `;
-            habitsGrid.appendChild(card);
+        habits.forEach(function (h) {
+            var box = document.createElement("div");
+            box.className = "habit";
+
+            box.innerHTML = `
+        <div class="left">
+          <strong>${h.title}</strong><br>
+          <span class="goal">${h.goal} days/week</span>
+        </div>
+
+        <div>
+          <button class="toggleBtn">${h.doneDates.includes(today()) ? "Undo" : "Done"}</button>
+          <button class="delBtn">Delete</button>
+        </div>
+      `;
+
+            box.querySelector(".toggleBtn").addEventListener("click", function () {
+                toggleHabit(h.id);
+            });
+
+            box.querySelector(".delBtn").addEventListener("click", function () {
+                deleteHabit(h.id);
+            });
+
+            habitsList.appendChild(box);
         });
     }
 
-    function renderTasks(tasks) {
-        scheduleBody.innerHTML = '';
-        tasks.sort((a, b) => a.time.localeCompare(b.time));
+    // Show all tasks
+    function showTasks() {
+        var tasks = loadData(TASKS_KEY);
+        tasks.sort(function (a, b) {
+            return a.time.localeCompare(b.time);
+        });
 
-        tasks.forEach(task => {
-            const row = document.createElement('tr');
+        tasksTableBody.innerHTML = "";
+
+        tasks.forEach(function (t) {
+            var row = document.createElement("tr");
+
             row.innerHTML = `
-                <td>${task.time}</td>
-                <td class="${task.completed ? 'task-completed' : ''}">${task.title}</td>
-                <td><span class="status-badge ${task.completed ? 'status-done' : 'status-pending'}">${task.completed ? 'Done' : 'Pending'}</span></td>
-                <td>
-                    <button class="action-btn" onclick="toggleTask('${task.id}', ${task.completed})">
-                        <i class="fa-solid ${task.completed ? 'fa-rotate-left' : 'fa-check'}"></i>
-                    </button>
-                    <button class="action-btn delete" onclick="deleteTask('${task.id}')">
-                        <i class="fa-solid fa-trash"></i>
-                    </button>
-                </td>
-            `;
-            scheduleBody.appendChild(row);
+        <td>${t.time}</td>
+        <td class="${t.done ? "task-done" : ""}">${t.title}</td>
+        <td>
+          <button class="toggleBtn">${t.done ? "Undo" : "Done"}</button>
+          <button class="delBtn">Delete</button>
+        </td>
+      `;
+
+            row.querySelector(".toggleBtn").addEventListener("click", function () {
+                toggleTask(t.id);
+            });
+
+            row.querySelector(".delBtn").addEventListener("click", function () {
+                deleteTask(t.id);
+            });
+
+            tasksTableBody.appendChild(row);
         });
     }
 
-    // --- Actions ---
-    window.toggleHabit = (id, isCompleted) => {
-        const habits = getHabits();
-        const habit = habits.find(h => h.id === id);
-        const today = new Date().toISOString().split('T')[0];
+    // Add new habit
+    function addHabit(title, goal) {
+        var habits = loadData(HABITS_KEY);
+        habits.push({
+            id: makeId(),
+            title: title,
+            goal: parseInt(goal),
+            doneDates: []
+        });
+        saveData(HABITS_KEY, habits);
+        showHabits();
+    }
 
-        if (isCompleted) {
-            habit.completedDates = habit.completedDates.filter(d => d !== today);
-        } else {
-            habit.completedDates.push(today);
-        }
+    // Mark habit done/undo
+    function toggleHabit(id) {
+        var habits = loadData(HABITS_KEY);
+        habits.forEach(function (h) {
+            if (h.id === id) {
+                if (h.doneDates.includes(today())) {
+                    h.doneDates = h.doneDates.filter(function (d) { return d !== today(); });
+                } else {
+                    h.doneDates.push(today());
+                }
+            }
+        });
+        saveData(HABITS_KEY, habits);
+        showHabits();
+    }
 
-        saveHabits(habits);
-        fetchHabits();
-    };
+    // Delete habit
+    function deleteHabit(id) {
+        var habits = loadData(HABITS_KEY).filter(function (h) {
+            return h.id !== id;
+        });
+        saveData(HABITS_KEY, habits);
+        showHabits();
+    }
 
-    window.deleteHabit = (id) => {
-        let habits = getHabits();
-        habits = habits.filter(h => h.id !== id);
-        saveHabits(habits);
-        fetchHabits();
-    };
+    // Add task
+    function addTask(title, time) {
+        var tasks = loadData(TASKS_KEY);
+        tasks.push({
+            id: makeId(),
+            title: title,
+            time: time,
+            done: false
+        });
+        saveData(TASKS_KEY, tasks);
+        showTasks();
+    }
 
-    window.toggleTask = (id, isCompleted) => {
-        const tasks = getTasks();
-        const task = tasks.find(t => t.id === id);
-        task.completed = !isCompleted;
-        saveTasks(tasks);
-        fetchTasks();
-    };
+    // Toggle task done
+    function toggleTask(id) {
+        var tasks = loadData(TASKS_KEY);
+        tasks.forEach(function (t) {
+            if (t.id === id) {
+                t.done = !t.done;
+            }
+        });
+        saveData(TASKS_KEY, tasks);
+        showTasks();
+    }
 
-    window.deleteTask = (id) => {
-        let tasks = getTasks();
-        tasks = tasks.filter(t => t.id !== id);
-        saveTasks(tasks);
-        fetchTasks();
-    };
+    // Delete task
+    function deleteTask(id) {
+        var tasks = loadData(TASKS_KEY).filter(function (t) {
+            return t.id !== id;
+        });
+        saveData(TASKS_KEY, tasks);
+        showTasks();
+    }
 
-    // --- Modals ---
-    addHabitBtn.onclick = () => { habitModal.style.display = 'flex'; };
-    addTaskBtn.onclick = () => { taskModal.style.display = 'flex'; };
+    // Form submit: habits
+    habitForm.addEventListener("submit", function (e) {
+        e.preventDefault();
 
-    closeModals.forEach(btn => {
-        btn.onclick = () => {
-            habitModal.style.display = 'none';
-            taskModal.style.display = 'none';
-        };
+        var title = document.getElementById("habitTitle").value.trim();
+        var goal = document.getElementById("habitGoal").value;
+
+        if (title === "") return;
+
+        addHabit(title, goal);
+        habitForm.reset();
     });
 
-    window.onclick = (event) => {
-        if (event.target == habitModal) habitModal.style.display = 'none';
-        if (event.target == taskModal) taskModal.style.display = 'none';
-    };
-
-    // --- Forms ---
-    habitForm.onsubmit = (e) => {
+    // Form submit: tasks
+    taskForm.addEventListener("submit", function (e) {
         e.preventDefault();
-        const title = document.getElementById('habit-title').value;
-        const goal = document.getElementById('habit-goal').value;
 
-        const habits = getHabits();
-        const newHabit = {
-            id: Date.now().toString(),
-            userId,
-            title,
-            goal: parseInt(goal),
-            completedDates: []
-        };
-        habits.push(newHabit);
-        saveHabits(habits);
+        var title = document.getElementById("taskTitle").value.trim();
+        var time = document.getElementById("taskTime").value;
 
-        habitForm.reset();
-        habitModal.style.display = 'none';
-        fetchHabits();
-    };
+        if (title === "" || time === "") return;
 
-    taskForm.onsubmit = (e) => {
-        e.preventDefault();
-        const title = document.getElementById('task-title').value;
-        const time = document.getElementById('task-time').value;
-
-        const tasks = getTasks();
-        const newTask = {
-            id: Date.now().toString(),
-            userId,
-            title,
-            time,
-            completed: false
-        };
-        tasks.push(newTask);
-        saveTasks(tasks);
-
+        addTask(title, time);
         taskForm.reset();
-        taskModal.style.display = 'none';
-        fetchTasks();
-    };
+    });
 
-    // --- Initial Load ---
-    fetchHabits();
-    fetchTasks();
+    // Theme toggle
+    themeBtn.addEventListener("click", function () {
+        var current = document.documentElement.getAttribute("data-theme");
+        if (current === "dark") {
+            document.documentElement.setAttribute("data-theme", "light");
+        } else {
+            document.documentElement.setAttribute("data-theme", "dark");
+        }
+    });
+
+    // Initial display
+    showHabits();
+    showTasks();
 });

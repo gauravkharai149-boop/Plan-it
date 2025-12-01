@@ -1,48 +1,58 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PlanIt - Habit Tracker & Daily Planner</title>
+    <title>PlanIt - Habit & Task Planner</title>
+
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
+
 <body>
+
     <div class="app-container">
+
+        <!-- HEADER -->
         <header>
-            <div class="logo">
-                <i class="fa-solid fa-check-double"></i> PlanIt
-            </div>
-            <button id="theme-toggle" class="icon-btn" aria-label="Toggle Dark Mode">
-                <i class="fa-solid fa-moon"></i>
-            </button>
+            <div class="logo"><i class="fa-solid fa-check-double"></i> PlanIt</div>
+            <button id="theme-toggle" class="icon-btn"><i class="fa-solid fa-moon"></i></button>
         </header>
 
+        <!-- HERO -->
         <section class="hero">
             <div class="hero-content">
                 <h1>Own Your Day, <span class="highlight">Master Your Life</span></h1>
-                <p>Track your habits, plan your schedule, and achieve your goals with focus and clarity.</p>
+                <p>Track your habits and plan your day with clarity.</p>
                 <button id="start-btn" class="cta-btn">Get Started</button>
             </div>
         </section>
 
         <main>
+
+            <!-- HABITS -->
             <section class="habits-section">
                 <div class="section-header">
                     <h2>Habit Tracker</h2>
-                    <button id="add-habit-btn" class="add-btn"><i class="fa-solid fa-plus"></i> Add Habit</button>
+                    <button id="add-habit-btn" class="add-btn">
+                        <i class="fa-solid fa-plus"></i> Add Habit
+                    </button>
                 </div>
-                <div id="habits-grid" class="habits-grid">
-                    <!-- Habits will be injected here -->
-                </div>
+
+                <div id="habits-grid" class="habits-grid"></div>
             </section>
 
+            <!-- SCHEDULE -->
             <section class="schedule-section">
                 <div class="section-header">
                     <h2>Daily Schedule</h2>
-                    <button id="add-task-btn" class="add-btn"><i class="fa-solid fa-plus"></i> Add Task</button>
+                    <button id="add-task-btn" class="add-btn">
+                        <i class="fa-solid fa-plus"></i> Add Task
+                    </button>
                 </div>
+
                 <div class="schedule-container">
                     <table class="schedule-table">
                         <thead>
@@ -53,58 +63,67 @@
                                 <th>Actions</th>
                             </tr>
                         </thead>
-                        <tbody id="schedule-body">
-                            <!-- Tasks will be injected here -->
-                        </tbody>
+                        <tbody id="schedule-body"></tbody>
                     </table>
                 </div>
             </section>
+
         </main>
 
+        <!-- FOOTER -->
         <footer>
-            <p>&copy; 2023 PlanIt. Built for productivity.</p>
+            <p>© 2023 PlanIt – Built for productivity.</p>
         </footer>
+
     </div>
 
-    <!-- Modals -->
+    <!-- HABIT MODAL -->
     <div id="habit-modal" class="modal">
         <div class="modal-content">
             <span class="close-modal">&times;</span>
-            <h3 id="habit-modal-title">Add New Habit</h3>
+            <h3>Add Habit</h3>
             <form id="habit-form">
                 <input type="hidden" id="habit-id">
+
                 <div class="form-group">
-                    <label for="habit-title">Habit Name</label>
-                    <input type="text" id="habit-title" required placeholder="e.g., Read 30 mins">
+                    <label>Habit Name</label>
+                    <input type="text" id="habit-title" required placeholder="e.g., Drink Water">
                 </div>
+
                 <div class="form-group">
-                    <label for="habit-goal">Weekly Goal (Days)</label>
-                    <input type="number" id="habit-goal" min="1" max="7" value="7" required>
+                    <label>Weekly Goal (Days)</label>
+                    <input type="number" id="habit-goal" min="1" max="7" value="7">
                 </div>
-                <button type="submit" class="submit-btn">Save Habit</button>
+
+                <button class="submit-btn">Save</button>
             </form>
         </div>
     </div>
 
+    <!-- TASK MODAL -->
     <div id="task-modal" class="modal">
         <div class="modal-content">
             <span class="close-modal">&times;</span>
-            <h3 id="task-modal-title">Add New Task</h3>
+            <h3>Add Task</h3>
             <form id="task-form">
                 <input type="hidden" id="task-id">
+
                 <div class="form-group">
-                    <label for="task-title">Task Description</label>
-                    <input type="text" id="task-title" required placeholder="e.g., Team Meeting">
+                    <label>Task</label>
+                    <input type="text" id="task-title" required placeholder="e.g., Study DSA">
                 </div>
+
                 <div class="form-group">
-                    <label for="task-time">Time</label>
+                    <label>Time</label>
                     <input type="time" id="task-time" required>
                 </div>
-                <button type="submit" class="submit-btn">Save Task</button>
+
+                <button class="submit-btn">Save</button>
             </form>
         </div>
     </div>
 
     <script src="script.js"></script>
 </body>
+
 </html>
