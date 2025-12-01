@@ -1,33 +1,31 @@
 document.addEventListener("DOMContentLoaded", function () {
+    console.log("Script loaded and running");
+
+    if (window.location.protocol === 'file:') {
+        alert("⚠️ STOP! You are opening this file directly.\n\nPlease open 'http://localhost:3000' in your browser to use the app.");
+        return;
+    }
 
     // Basic DOM references
-    var habitForm = document.getElementById("habitForm");
-    var taskForm = document.getElementById("taskForm");
-    var habitsList = document.getElementById("habitsList");
-    var tasksTableBody = document.querySelector("#tasksTable tbody");
-    var themeBtn = document.getElementById("themeBtn");
+    var habitForm = document.getElementById("habit-form");
+    var taskForm = document.getElementById("task-form");
+    var habitsList = document.getElementById("habits-grid");
+    var tasksTableBody = document.getElementById("schedule-body");
+    var themeBtn = document.getElementById("theme-toggle");
 
-    // Storage keys
-    var HABITS_KEY = "simple_habits";
-    var TASKS_KEY = "simple_tasks";
+    // Modal & Button references
+    var addHabitBtn = document.getElementById("add-habit-btn");
+    var addTaskBtn = document.getElementById("add-task-btn");
+    var startBtn = document.getElementById("start-btn");
+    var habitModal = document.getElementById("habit-modal");
+    var taskModal = document.getElementById("task-modal");
+    var closeButtons = document.querySelectorAll(".close-modal");
 
-    // Load data from storage
-    function loadData(key) {
-        var data = localStorage.getItem(key);
-        if (data) {
-            return JSON.parse(data);
-        }
-        return [];
-    }
-
-    // Save data to storage
-    function saveData(key, value) {
-        localStorage.setItem(key, JSON.stringify(value));
-    }
-
-    // Make simple id
-    function makeId() {
-        return "id" + Math.random().toString(36).substr(2, 6);
+    // User ID management
+    var userId = localStorage.getItem("planit_user_id");
+    if (!userId) {
+        userId = "user_" + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem("planit_user_id", userId);
     }
 
     // Today's date in yyyy-mm-dd
@@ -35,32 +33,52 @@ document.addEventListener("DOMContentLoaded", function () {
         return new Date().toISOString().split("T")[0];
     }
 
+    // API Helpers
+    async function fetchHabits() {
+        try {
+            const res = await fetch(`/api/habits/${userId}`);
+            return await res.json();
+        } catch (err) {
+            console.error("Error fetching habits:", err);
+            return [];
+        }
+    }
+
+    async function fetchTasks() {
+        try {
+            const res = await fetch(`/api/tasks/${userId}`);
+            return await res.json();
+        } catch (err) {
+            console.error("Error fetching tasks:", err);
+            return [];
+        }
+    }
+
     // Show all habits
-    function showHabits() {
-        var habits = loadData(HABITS_KEY);
+    async function showHabits() {
+        var habits = await fetchHabits();
         habitsList.innerHTML = "";
 
         habits.forEach(function (h) {
             var box = document.createElement("div");
-            box.className = "habit";
+            box.className = "habit-card";
 
             box.innerHTML = `
-        <div class="left">
-          <strong>${h.title}</strong><br>
-          <span class="goal">${h.goal} days/week</span>
+        <div class="habit-info">
+          <h3>${h.title}</h3>
+          <span class="goal-text">${h.goal} days/week</span>
         </div>
-
-        <div>
-          <button class="toggleBtn">${h.doneDates.includes(today()) ? "Undo" : "Done"}</button>
-          <button class="delBtn">Delete</button>
+        <div class="habit-actions">
+          <button class="toggle-btn ${h.doneDates.includes(today()) ? 'done' : ''}">${h.doneDates.includes(today()) ? "Undo" : "Done"}</button>
+          <button class="delete-btn"><i class="fa-solid fa-trash"></i></button>
         </div>
       `;
 
-            box.querySelector(".toggleBtn").addEventListener("click", function () {
-                toggleHabit(h.id);
+            box.querySelector(".toggle-btn").addEventListener("click", function () {
+                toggleHabit(h);
             });
 
-            box.querySelector(".delBtn").addEventListener("click", function () {
+            box.querySelector(".delete-btn").addEventListener("click", function () {
                 deleteHabit(h.id);
             });
 
@@ -69,8 +87,8 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     // Show all tasks
-    function showTasks() {
-        var tasks = loadData(TASKS_KEY);
+    async function showTasks() {
+        var tasks = await fetchTasks();
         tasks.sort(function (a, b) {
             return a.time.localeCompare(b.time);
         });
@@ -83,17 +101,18 @@ document.addEventListener("DOMContentLoaded", function () {
             row.innerHTML = `
         <td>${t.time}</td>
         <td class="${t.done ? "task-done" : ""}">${t.title}</td>
+        <td>${t.done ? '<span class="status-done">Completed</span>' : '<span class="status-pending">Pending</span>'}</td>
         <td>
-          <button class="toggleBtn">${t.done ? "Undo" : "Done"}</button>
-          <button class="delBtn">Delete</button>
+          <button class="action-btn toggle-btn"><i class="fa-solid ${t.done ? 'fa-rotate-left' : 'fa-check'}"></i></button>
+          <button class="action-btn delete-btn"><i class="fa-solid fa-trash"></i></button>
         </td>
       `;
 
-            row.querySelector(".toggleBtn").addEventListener("click", function () {
-                toggleTask(t.id);
+            row.querySelector(".toggle-btn").addEventListener("click", function () {
+                toggleTask(t);
             });
 
-            row.querySelector(".delBtn").addEventListener("click", function () {
+            row.querySelector(".delete-btn").addEventListener("click", function () {
                 deleteTask(t.id);
             });
 
@@ -102,114 +121,194 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     // Add new habit
-    function addHabit(title, goal) {
-        var habits = loadData(HABITS_KEY);
-        habits.push({
-            id: makeId(),
-            title: title,
-            goal: parseInt(goal),
-            doneDates: []
-        });
-        saveData(HABITS_KEY, habits);
-        showHabits();
+    async function addHabit(title, goal) {
+        try {
+            const res = await fetch('/api/habits', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: userId,
+                    title: title,
+                    goal: parseInt(goal)
+                })
+            });
+            if (!res.ok) throw new Error("Server error: " + res.status);
+            showHabits();
+            habitModal.style.display = "none";
+        } catch (err) {
+            console.error("Error adding habit:", err);
+            alert("Failed to save habit. Is the server running? Error: " + err.message);
+        }
     }
 
     // Mark habit done/undo
-    function toggleHabit(id) {
-        var habits = loadData(HABITS_KEY);
-        habits.forEach(function (h) {
-            if (h.id === id) {
-                if (h.doneDates.includes(today())) {
-                    h.doneDates = h.doneDates.filter(function (d) { return d !== today(); });
-                } else {
-                    h.doneDates.push(today());
-                }
-            }
-        });
-        saveData(HABITS_KEY, habits);
-        showHabits();
+    async function toggleHabit(habit) {
+        let newDates = habit.doneDates;
+        if (newDates.includes(today())) {
+            newDates = newDates.filter(d => d !== today());
+        } else {
+            newDates.push(today());
+        }
+
+        try {
+            const res = await fetch(`/api/habits/${habit.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ doneDates: newDates })
+            });
+            if (!res.ok) throw new Error("Server error: " + res.status);
+            showHabits();
+        } catch (err) {
+            console.error("Error toggling habit:", err);
+            alert("Failed to update habit. Error: " + err.message);
+        }
     }
 
     // Delete habit
-    function deleteHabit(id) {
-        var habits = loadData(HABITS_KEY).filter(function (h) {
-            return h.id !== id;
-        });
-        saveData(HABITS_KEY, habits);
-        showHabits();
+    async function deleteHabit(id) {
+        if (!confirm("Are you sure you want to delete this habit?")) return;
+        try {
+            const res = await fetch(`/api/habits/${id}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error("Server error: " + res.status);
+            showHabits();
+        } catch (err) {
+            console.error("Error deleting habit:", err);
+            alert("Failed to delete habit. Error: " + err.message);
+        }
     }
 
     // Add task
-    function addTask(title, time) {
-        var tasks = loadData(TASKS_KEY);
-        tasks.push({
-            id: makeId(),
-            title: title,
-            time: time,
-            done: false
-        });
-        saveData(TASKS_KEY, tasks);
-        showTasks();
+    async function addTask(title, time) {
+        try {
+            const res = await fetch('/api/tasks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: userId,
+                    title: title,
+                    time: time
+                })
+            });
+            if (!res.ok) throw new Error("Server error: " + res.status);
+            showTasks();
+            taskModal.style.display = "none";
+        } catch (err) {
+            console.error("Error adding task:", err);
+            alert("Failed to save task. Is the server running? Error: " + err.message);
+        }
     }
 
     // Toggle task done
-    function toggleTask(id) {
-        var tasks = loadData(TASKS_KEY);
-        tasks.forEach(function (t) {
-            if (t.id === id) {
-                t.done = !t.done;
-            }
-        });
-        saveData(TASKS_KEY, tasks);
-        showTasks();
+    async function toggleTask(task) {
+        try {
+            await fetch(`/api/tasks/${task.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ done: !task.done })
+            });
+            showTasks();
+        } catch (err) {
+            console.error("Error toggling task:", err);
+        }
     }
 
     // Delete task
-    function deleteTask(id) {
-        var tasks = loadData(TASKS_KEY).filter(function (t) {
-            return t.id !== id;
+    async function deleteTask(id) {
+        if (!confirm("Are you sure you want to delete this task?")) return;
+        try {
+            await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+            showTasks();
+        } catch (err) {
+            console.error("Error deleting task:", err);
+        }
+    }
+
+    // --- Event Listeners ---
+
+    // Open Modals
+    if (addHabitBtn) {
+        addHabitBtn.addEventListener("click", function () {
+            habitModal.style.display = "block";
         });
-        saveData(TASKS_KEY, tasks);
-        showTasks();
+    }
+
+    if (addTaskBtn) {
+        addTaskBtn.addEventListener("click", function () {
+            taskModal.style.display = "block";
+        });
+    }
+
+    // Close Modals
+    closeButtons.forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            habitModal.style.display = "none";
+            taskModal.style.display = "none";
+        });
+    });
+
+    window.addEventListener("click", function (e) {
+        if (e.target == habitModal) habitModal.style.display = "none";
+        if (e.target == taskModal) taskModal.style.display = "none";
+    });
+
+    // Scroll to Habits
+    if (startBtn) {
+        startBtn.addEventListener("click", function () {
+            document.querySelector(".habits-section").scrollIntoView({ behavior: "smooth" });
+        });
     }
 
     // Form submit: habits
-    habitForm.addEventListener("submit", function (e) {
-        e.preventDefault();
+    if (habitForm) {
+        habitForm.addEventListener("submit", function (e) {
+            e.preventDefault();
+            console.log("Form submitted");
 
-        var title = document.getElementById("habitTitle").value.trim();
-        var goal = document.getElementById("habitGoal").value;
+            var title = document.getElementById("habit-title").value.trim();
+            var goal = document.getElementById("habit-goal").value;
 
-        if (title === "") return;
+            // DEBUG ALERTS
+            alert("Debug: Form submitted!\nTitle: " + title + "\nGoal: " + goal);
 
-        addHabit(title, goal);
-        habitForm.reset();
-    });
+            if (title === "") {
+                alert("Please enter a habit name.");
+                return;
+            }
+
+            addHabit(title, goal);
+            habitForm.reset();
+        });
+    }
 
     // Form submit: tasks
-    taskForm.addEventListener("submit", function (e) {
-        e.preventDefault();
-
-        var title = document.getElementById("taskTitle").value.trim();
-        var time = document.getElementById("taskTime").value;
-
-        if (title === "" || time === "") return;
-
-        addTask(title, time);
-        taskForm.reset();
-    });
+    if (taskForm) {
+        taskForm.addEventListener("submit", function (e) {
+            e.preventDefault();
+            var title = document.getElementById("task-title").value.trim();
+            var time = document.getElementById("task-time").value;
+            if (title === "" || time === "") return;
+            addTask(title, time);
+            taskForm.reset();
+        });
+    }
 
     // Theme toggle
-    themeBtn.addEventListener("click", function () {
-        var current = document.documentElement.getAttribute("data-theme");
-        if (current === "dark") {
-            document.documentElement.setAttribute("data-theme", "light");
-        } else {
-            document.documentElement.setAttribute("data-theme", "dark");
-        }
-    });
+    if (themeBtn) {
+        themeBtn.addEventListener("click", function () {
+            var current = document.documentElement.getAttribute("data-theme");
+            if (current === "dark") {
+                document.documentElement.setAttribute("data-theme", "light");
+            } else {
+                document.documentElement.setAttribute("data-theme", "dark");
+            }
+        });
+    }
 
     // Initial display
     showHabits();
     showTasks();
+
+    // DEBUG: Check if elements were found
+    alert("Script initialized.\nHabit Form found: " + !!habitForm + "\nTask Form found: " + !!taskForm);
+    console.log("Script initialized. Habit Form:", habitForm);
 });

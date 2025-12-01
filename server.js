@@ -8,17 +8,38 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.static('public'));
 
+// Request logging
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    if (Object.keys(req.body).length > 0) {
+        console.log('Body:', JSON.stringify(req.body, null, 2));
+    }
+    next();
+});
+
 // Data files
-const habitsFile = 'habits.json';
-const tasksFile = 'tasks.json';
+// Data files
+const dataDir = '/data'; // Render persistent disk for writable storage
+const habitsFile = path.join(dataDir, 'habits.json');
+const tasksFile = path.join(dataDir, 'tasks.json');
+
+// Ensure data directory exists
+if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir);
+}
 
 // Read helper
 function readFile(file) {
     if (!fs.existsSync(file)) {
         return [];
     }
-    const data = fs.readFileSync(file, 'utf8');
-    return JSON.parse(data);
+    try {
+        const data = fs.readFileSync(file, 'utf8');
+        return data ? JSON.parse(data) : [];
+    } catch (err) {
+        console.error(`Error reading/parsing ${file}:`, err);
+        return [];
+    }
 }
 
 // Write helper
@@ -41,7 +62,7 @@ app.post('/api/habits', (req, res) => {
         userId: req.body.userId,
         title: req.body.title,
         goal: req.body.goal,
-        completedDates: []
+        doneDates: []
     };
     habits.push(newHabit);
     writeFile(habitsFile, habits);
@@ -82,7 +103,7 @@ app.post('/api/tasks', (req, res) => {
         userId: req.body.userId,
         title: req.body.title,
         time: req.body.time,
-        completed: false
+        done: false
     };
     tasks.push(newTask);
     writeFile(tasksFile, tasks);
